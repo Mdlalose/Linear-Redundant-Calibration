@@ -1,10 +1,10 @@
-#Classical omnical
+#Linear Rendundant calibration schem
 
 import numpy as np, math 
 from numpy.linalg import inv
 from matplotlib import pyplot as plt
 from scipy import linalg as lin
-#import simulated_vis as sim_data
+
 
 
 def get_config_matrix(case,n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique):
@@ -57,16 +57,19 @@ def Pinv(Matrix,eigen_threshold=10**-6):
 def  model_vis(g,sky,ant1,ant2,vis_map):
     return np.conj(g[ant1])*g[ant2]*sky[vis_map]
 
-
+# lincal function
 
 def lincal(data,g_0,s_0,ant1,ant2,vis_map):
      # linear Redundant calibration algorithm
      # this function compute deviations in gains & sky and then update the guess paramters
      B= get_config_matrix(2,g_0.size,ant1,ant2,vis_map,g_0,s_0,data,s_0.size)
      #B = np.matrix(B)
-     Curvature_matrix = B.T.dot(B)
+     Curvature_matrix = np.conj(B).T.dot(B)
+     #Curvature_matrix = B.getH().dot(B)
+
      #delta_X = Pinv(Curvature_matrix).dot(A.T).dot(data-model_vis(g_0,s_0,ant1,ant2,vis_map)
-     delta_X = lin.pinv(Curvature_matrix).dot(B.T).dot(data-model_vis(g_0,s_0,ant1,ant2,vis_map))
+     delta_X = lin.pinv(Curvature_matrix).dot(np.conj(B).T).dot(data-model_vis(g_0,s_0,ant1,ant2,vis_map))
+     #delta_X = lin.pinv(Curvature_matrix).dot(B.getH()).dot(data-model_vis(g_0,s_0,ant1,ant2,vis_map))
      g_1 = g_0 + delta_X[s_0.size:len(delta_X)]
      s_1 = s_0 +  delta_X[0:s_0.size]
      #chi= get_chisqd(,data,s_1,ant1,ant2,vis_map)
@@ -75,41 +78,7 @@ def lincal(data,g_0,s_0,ant1,ant2,vis_map):
 
 
 
-def get_lincal_chisqd(data,g_0,s_0,g_new,s_new,ant1,ant2,vis_map):
-     
-      B = get_config_matrix(2,g_0.size,ant1,ant2,vis_map,g_0,s_0,data,s_0.size)
-      dx = np.concatenate((g_new-g_0,s_new-s_0))
-      error = data - (model_vis(g_0,s_0,ant1,ant2,vis_map) + B.dot(dx))
-      chi = np.conj(error).T.dot(error) 														      
-      return chi
-            
 
-        
-def get_lincal_grad(data,g_0,s_0,g_new,s_new,ant1,ant2,vis_map):
-    B = get_config_matrix(2,g_0.size,ant1,ant2,vis_map,g_0,s_0,data,s_0.size)
-    dx = np.concatenate((g_new-g_0,s_new-s_0))
-    grad = -2.0*np.conj(B).T.dot(data - (model_vis(g_0,s_0,ant1,ant2,vis_map) + B.dot(dx)))
-    return grad
-        
-def get_lincal_curv(data,g_0,s_0,g_new,s_new,ant1,ant2,vis_map):
-    B= get_config_matrix(2,g_0.size,ant1,ant2,vis_map,g_0,s_0,data,s_0.size)
-    curv = 2.0*np.conj(B).T.dot(B)
-    return curv
-							
-def newton_cal(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique,tol,n_iter):
-    
-        x_0 = np.concatenate(gain_param,sky_param)
-        for k in range(n_iter):
-            grad_matrix     = config_matrix(n_ants,ant1,ant2,vis_map,x_0[0:n_ants.size],x_0[n_ants.size:len(x_0)],q,n_unique)
-            Curvature_matrix = config_matrix(n_ants,ant1,ant2,x_0[0:n_ants.size],x_0[n_ants.size:len(x_0)],q,n_unique).T.dot(config_matrix(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique))
-            x_n= x_0 - lin.pinv(Curvature_matrix ).dot(grad_)
-           
-            
-            if lin.norm(x_n- x_0)<= tol:
-                return x_n
-            else:
-                x_0=x_n
-            
 
             		
             
@@ -117,7 +86,7 @@ def newton_cal(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique,tol,n_it
 
 
     
-def B_matrix(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique): 
+def B_matrix_lua(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique): 
         A = np.zeros((q.size, 2.0*n_ants.size + n_unique),dtype ="complex")
         for vis_ in range(q.size):
             A[vis_][vis_map[vis_]]          =  np.conj(gain_param[ant1[vis_]])*gain_param[ant2[vis_]]
@@ -133,7 +102,7 @@ def B_matrix(n_ants,ant1,ant2,vis_map,gain_param,sky_param,q,n_unique):
     
     
     
-def lincal2(data,eta_0,phi_0,s_0,vis_u_map,ant1,ant2,n_ants):
+def lincal_lua(data,eta_0,phi_0,s_0,vis_u_map,ant1,ant2,n_ants):
     n_unique = s_0.size
     gain_0 = np.exp(eta_0)*(np.cos(phi_0)+1j*np.sin(phi_0))
     #gain_0 = gain_0/np.mean(gain_0)
