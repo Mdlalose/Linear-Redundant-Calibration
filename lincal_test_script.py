@@ -12,7 +12,6 @@ import sys
 # 5th arg is number of iteration
 
 # simulate fake data nxn array element
-
 xdim = int(sys.argv[1])
 ydim = int(sys.argv[2])
 #print ydim, xdim
@@ -70,26 +69,36 @@ for ind in range(q.size):
 # fake antenna gains
 eta= np.random.normal(0.0,1.0)*np.random.randn(xdim*ydim)
 amp = np.exp(eta)
-phase = np.random.uniform(0.0,2.0*math.pi)*np.random.randn(xdim*ydim)
+phase = np.random.uniform(0.0,math.pi/20.0)*np.random.randn(xdim*ydim)
 gains= amp*(np.cos(phase)+ 1j*np.sin(phase))
+
+#gains = np.ones(xdim*ydim,dtype='complex')
+#gains[0]= gains_s[0]
 
 # fake true sky signal for n_unique baselines
 
 amp= np.random.normal(0.0,0.5)*np.random.randn(n_unique)
-phase = np.random.uniform(0.0,2.0*math.pi)*np.random.randn(n_unique)
+phase = np.random.uniform(0.0,math.pi/20.0)*np.random.randn(n_unique)
 sky_true =amp*(np.cos(phase)+ 1j*np.sin(phase))
      
 
 # fake visibilities
 Vis_data =np.conj(gains[ant1])*gains[ant2]*sky_true[vis_map] # + 0.01*np.random.randn(q.size)
-noise_frac_gains = float(sys.argv[3])
-noise_frac_sky = float(sys.argv[4])
+"""
+
+ant1,ant2,vis_map = np.load('ants_data_100_point_src_0.1_pos_dev.npy')[0], np.load('ants_data_100_point_src_0.1_pos_dev.npy')[1],np.load('ants_data_100_point_src_0.1_pos_dev.npy')[2]
+sky_true, gains =  np.load('data_vis_uniq_100_point_src_0.1_pos_dev.npy'),np.load('data_gains_100_point_src-0.1_pos_dev.npy') 
+Vis_data = np.load('data_vis_100_point_src_0.1_pos_dev.npy') 
+
+"""
+noise_frac_gains = np.random.normal(0.0,float(sys.argv[3]))
+noise_frac_sky = np.random.normal(0.0,float(sys.argv[4]))
 
 
-g_0 = gains  + noise_frac_gains*np.random.randn(gains.size) # gain_0 
+gains = gains  + noise_frac_gains*np.ones(gains.size) # gain_0 
 #g_0 = g_0/np.mean(g_0) 
-
-s_0 = sky_true + noise_frac_sky*np.random.randn(sky_true.size)
+g_0= gains
+s_0 = sky_true + noise_frac_sky*np.ones(sky_true.size)
 
 def  model_vis(g,sky,vis_map):
   
@@ -108,7 +117,7 @@ def linncal_func(Vis,g_0,s_0,N_steps):
         P = omnical.lincal(Vis,g_0,s_0,ant1,ant2,vis_map)
         Parameter[j] =P
         
-        
+       
         s_0 = P[1]
         g_0 = P[0]
         
@@ -119,8 +128,12 @@ def linncal_func(Vis,g_0,s_0,N_steps):
 
 
 n_iter =  int(sys.argv[5])			
-data_inter = linncal_func(Vis_data,g_0,s_0,n_iter)[0] 
-chi_sqd  = np.array(linncal_func(Vis_data,g_0,s_0,n_iter)[1])
+#data_inter = linncal_func(Vis_data,g_0,s_0,n_iter)[0] 
+#chi_sqd  = np.array(linncal_func(Vis_data,g_0,s_0,n_iter)[1])
+
+data_iter = omnical.get_lincal(Vis_data,g_0,s_0,n_iter,ant1,ant2,vis_map)
+ 
+chi_sqd  = data_iter[2]
 
 
 
@@ -132,17 +145,17 @@ chi_sqd  = np.array(linncal_func(Vis_data,g_0,s_0,n_iter)[1])
 
 
 #REAL PART
-plt.plot(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).real/Vis_data.real,'.',label='1st iteration ')
+#plt.plot(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).real/Vis_data.real,'.',label='100 iteration ')
+plt.plot(model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map).real/Vis_data.real,'.',label='100 iteration ')
 
-
-plt.plot(np.ones(len(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map))),'r',label='VRF=1.0')
+#plt.plot(np.ones(len(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map))),'r',label='VRF=1.0')
 
 plt.ylabel(r'Visibility Residual Fraction ')
 
 plt.title('Real Part')
-#plt.legend(loc = 'best')
+plt.legend(loc = 'best')
 plt.show()
-
+"""
 # Imaginary part
 plt.plot(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).imag/Vis_data.imag,'.',label='3rd Iteration')
 
@@ -153,12 +166,14 @@ plt.ylabel(r'Visibility Residual Fraction')
 plt.title('Imaginary Part')
 #plt.legend(loc = 'best')
 plt.show()
-
+"""
 
 
 plt.plot(Vis_data.real,Vis_data.imag,'>r',label='Simulated Visibilities')
-plt.plot(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).real,model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).imag,'.k',label='Best Fit Visibilities')
+#plt.plot(model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).real,model_vis(data_inter[n_iter-1][0],data_inter[n_iter-1][1],vis_map).imag,'.k',label='Best Fit Visibilities')
 
+plt.plot(model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map).real,model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map).imag,'.k',label='Best Fit Visibilities')
+print ' std ', np.std(model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map)- Vis_data)/np.std(model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map))
 plt.ylabel(r'Imaginary Part ')
 plt.xlabel('Real Part')
 #plt.title('3rd Iteration')
@@ -167,28 +182,44 @@ plt.legend(loc = 'best')
 plt.grid(True)
 plt.axis('equal')
 plt.show()
+"""
+plt.plot(Vis_data.real, model_vis(data_iter[0][data_iter[3]],data_iter[1][data_iter[3]],vis_map).real, '*')
+plt.xlabel('input visibilities')
+plt.ylabel('output visibilties')
+plt.show()
 
 
+plt.plot(gains.real,data_iter[0][data_iter[3].real, '*')
+plt.xlabel('input gains')
+plt.ylabel('output output')
+plt.show()
+
+plt.plot(sky_true.real,.real, '*')
+plt.xlabel('input sky')
+plt.ylabel('output sky')
+plt.show()
+"""
 ##############################################################################
 ####################### chi squared plots ##################################
 
-plt.plot(chi_sqd, '*')
+plt.plot(chi_sqd)
 plt.xlabel('N_iterations')
-plt.ylabel(r'$\chi^2$')
+plt.ylabel(r'$log(\chi^2)$')
 
 #plt.axis([-10,150, -10.0, chisqd[-1]])
 plt.show()
 
 plt.plot(gains.real, gains.imag,'<', label ='Simulated Input gains factors')
-plt.plot(data_inter[n_iter-1][0].real,data_inter[n_iter-1][0].imag,'.', label ='Best Fit gain factors')
+plt.plot(data_iter[0][data_iter[3]].real,data_iter[0][data_iter[3]].imag,'.', label ='Best Fit gain factors')
 
 plt.xlabel('Real Part')
 plt.ylabel('Imaginary Part')
 plt.legend(loc="best")
 plt.show()
 
+
 plt.plot(sky_true.real,sky_true.imag,'*',label='Simulated True Sky')
-plt.plot(data_inter[n_iter-1][1].real,data_inter[n_iter-1][1].imag,'v',label='Best Fit True Sky')
+plt.plot(data_iter[1][data_iter[3]].real,data_iter[1][data_iter[3]].imag,'v',label='Best Fit True Sky')
 plt.xlabel('Real Part')
 plt.ylabel('Imaginary Part')
 plt.legend(loc='best')
