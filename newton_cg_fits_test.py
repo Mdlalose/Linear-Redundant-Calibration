@@ -3,32 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize as min_newton_cg
 import get_chi2_func
 import lincal
-
-ant1,ant2,vis_map = np.load('ants_data_1_point_src_0.3_dev.npy')[0], np.load('ants_data_1_point_src_0.3_dev.npy')[1],np.load('ants_data_1_point_src_0.3_dev.npy')[2]
-sky,gains =  np.load('data_vis_uniq_1_point_src_0.3_dev.npy'),np.load('data_gains_100_point_src_0.3_dev.npy') 
-data = np.load('data_vis_1_point_src_0.3_dev.npy') 
-
-def get_lin_chi(x):
-    gains_0 = x[0:gains.size]					
-    gains_new = gains_0 + 0.00001*np.random.randn(gains_0.size)
-    sky_0 = x[gains.size:x.size]
-    sky_new = sky_0 + 0.00001*np.random.randn(sky_0.size)					
-    return lincal.get_lincal_chisqd(data,gains_0,sky_0,gains_new,sky_new,ant1,ant2,vis_map)
-
-def get_lin_grad(x):
-    gains_0 = x[0:gains.size]
-    gains_new = gains_0 + 0.00001*np.random.randn(gains.size)
-    sky_0 = x[gains.size:x.size]
-    sky_new = sky_0 + 0.00001*np.random.randn(sky_0.size)
-    return lincal.get_lincal_grad(data,gains_0,sky_0,gains_new,sky_new,ant1,ant2,vis_map)
-
-def get_lin_curv(x):
-    gains_0 =x[0:gains.size]
-    gains_new = gains_0 + 0.00001*np.random.randn(gains_0.size)
-    sky_0 = x[gains_0.size:x.size]
-    sky_new = sky_0 + 0.00001*np.random.randn(sky_0.size)
-    return lincal.get_lincal_curv(data,gains_0,sky_0,gains_new,sky_new,ant1,ant2,vis_map)
-
+import sys
 
 def chi_func(x):
      
@@ -53,8 +28,8 @@ def chi_func_curv(x):
 ### ##################################### data test#############################################
 
 """
-xdim =4
-ydim = 4
+xdim = 4 #int(sys.argv([1]))
+ydim =  4 #int(sys.argv([2]))
     
 xx=np.arange(xdim)
 yy=np.arange(ydim)
@@ -129,45 +104,61 @@ for s in range(n_unique):
 
 data =np.conj(gains[ant1])*gains[ant2]*sky[vis_map] #+ 0.1*np.random.randn(q.size)
 """
-gains_0 =gains + 0.001*np.random.randn(gains.size)
-sky_0 = sky + 0.001*np.random.randn(sky.size)
+#gains_0 =gains + 0.1*np.random.randn(gains.size)
+#sky_0 = sky + 0.1*np.random.randn(sky.size)
+ant1,ant2,vis_map = np.load('ants_data_100_point_src_0.1_pos_dev.npy')[0], np.load('ants_data_100_point_src_0.1_pos_dev.npy')[1],np.load('ants_data_100_point_src_0.1_pos_dev.npy')[2]
+sky, gains =  np.load('data_vis_uniq_100_point_src_0.1_pos_dev.npy'),np.load('data_gains_100_point_src-0.1_pos_dev.npy') 
+data = np.load('data_vis_100_point_src_0.1_pos_dev.npy') 
 
+noise_frac_gains =float(sys.argv[3])
+noise_frac_sky = float(sys.argv[4])
+
+
+gains_0 = gains  + noise_frac_gains*np.ones(gains.size) # gain_0 
+#g_0 = g_0/np.mean(g_0) 
+g_0= gains
+sky_0 = sky + noise_frac_sky*np.ones(sky.size)
 x0= np.concatenate((gains_0,sky_0))
 Nfeval =1
+
 def callbackF(x):
+    #chi2=[]
     global Nfeval
     print '{0:4d} {1:3.6f}'.format(Nfeval,chi_func(x))
+    #chi2.append(chi_func(x)
     Nfeval +=1
+    
+    
 
 print 'full chi square'
-x_fits = min_newton_cg(chi_func,x0,callback=callbackF,method='Newton-CG',jac=chi_func_grad,hess=chi_func_curv,options={'xtol':1e-10,'disp': True})
+x_fits = min_newton_cg(chi_func,x0,callback=callbackF,method='Newton-CG',jac=chi_func_grad,hess=chi_func_curv,options={'xtol':1e-6,'disp': True})
 print 'linearize chi sqaured'
 
-x_lin_fits = min_newton_cg(get_lin_chi,x0,callback=callbackF,method='Newton-CG',jac=get_lin_grad,hess=get_lin_curv,options={'xtol':1e-10,'disp':True})
-print get_lin_chi(x0)
+#x_lin_fits = min_newton_cg(get_lin_chi,x0,callback=callbackF,method='Newton-CG',jac=get_lin_grad,hess=get_lin_curv,options={'xtol':1e-10,'disp':True})
+#print get_lin_chi(x0)
 #plt.ion()
-"""
-plt.plot(gains.real,gains.imag,'.', label='input gains')
-plt.plot(x_fits.x[0:gains.size].real,x_fits.x[0:gains.size].imag,'*', label='output gains')
+
+plt.plot(gains.real,gains.imag,'.', label='simulated gains')
+plt.plot(x_fits.x[0:gains.size].real,x_fits.x[0:gains.size].imag,'*', label='NW-CG Best fits gains')
 plt.xlabel('real part')
 plt.ylabel('imaginary part')
 plt.legend(loc='best')
 plt.show()
 		
 
-plt.plot(sky.real,sky.imag,'.', label='input true sky')
-plt.plot(x_fits.x[gains.size:x_fits.x.size].real,x_fits.x[gains.size:x_fits.x.size].imag,'.', label='output true sky')
+plt.plot(sky.real,sky.imag,'.', label='	simulated true sky')
+plt.plot(x_fits.x[gains.size:x_fits.x.size].real,x_fits.x[gains.size:x_fits.x.size].imag,'.', label='NW-CG Best fits true sky')
 plt.xlabel('real part')
 plt.ylabel('imaginary part')
 plt.legend(loc='best')
 plt.show()
-"""
+
 best_fit_gains =x_fits.x[0:gains.size]
 best_fit_sky = x_fits.x[gains.size:x_fits.x.size]
 best_fits_data = np.conj(best_fit_gains[ant1])*best_fit_gains[ant2]*best_fit_sky[vis_map]
 							
 		
-plt.title(r'Exact $\chi^2$')
+#plt.title(r'Exact $\chi^2$')
 plt.plot(best_fits_data.real,best_fits_data.imag,'.', label='NW-CG Best fits visibility')
 plt.plot(data.real,data.imag,'*', label='Simulsted visibility')
 plt.xlabel('real part')
